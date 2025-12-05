@@ -1,0 +1,3 @@
+[submodule "libs/plugin-sdk"]
+	path = libs/plugin-sdk
+	url = https://github.com/AthallahDzaki/plugin-sdk.git
