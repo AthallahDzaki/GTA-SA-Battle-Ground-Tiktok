@@ -1,5 +1,6 @@
 #include "MatchController.h"
 #include "../npc/NPCManager.h"
+#include "../ui/UIRenderer.h"
 #include "../config/ConfigManager.h"
 #include "../utils/Logger.h"
 
@@ -18,6 +19,7 @@ void MatchController::Initialize() {
     m_winner = nullptr;
     m_countdown = 0;
     m_winnerDelay = 0;
+    m_nextMatchDelay = 0;
 
     m_initialized = true;
     LOG_INFO("Match Controller initialized");
@@ -48,6 +50,9 @@ void MatchController::Update(float deltaTime) {
                     m_winnerCallback(m_winner);
                 }
                 SetState(MatchState::FINISHED);
+
+                m_nextMatchDelay = static_cast<float>(10);
+                break;
             }
             // Still check if more NPCs join
             CheckWinCondition();
@@ -55,6 +60,12 @@ void MatchController::Update(float deltaTime) {
 
         case MatchState::FINISHED:
             // Wait for reset
+            m_nextMatchDelay -= deltaTime;
+            if (m_nextMatchDelay <= 0) {
+                Reset();
+                NPCManager::GetInstance().RemoveAllNPCs();
+                UIRenderer::GetInstance().AddNotification(NotificationType::MATCH_END, "Match reset!");
+            }
             break;
     }
 }

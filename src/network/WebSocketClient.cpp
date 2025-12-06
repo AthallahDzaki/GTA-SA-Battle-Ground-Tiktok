@@ -1,3 +1,30 @@
+#pragma once
+
+// Protect this translation unit from common macro collisions.
+// These must be placed BEFORE any includes so macros don't break C++ tokens like Foo::constant.
+#ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#  define NOMINMAX
+#endif
+
+#ifdef constant
+#  undef constant
+#endif
+#ifdef DEBUG
+#  undef DEBUG
+#endif
+#ifdef INFO
+#  undef INFO
+#endif
+#ifdef WARNING
+#  undef WARNING
+#endif
+#ifdef ERROR
+#  undef ERROR
+#endif
+
 #include "WebSocketClient.h"
 #include "../config/ConfigManager.h"
 #include "../utils/Logger.h"
@@ -19,7 +46,7 @@ using json = nlohmann::json;
 namespace BattleGround {
 
 WebSocketClient::WebSocketClient()
-    : m_state(WebSocketState::DISCONNECTED)
+    : m_state(WebSocketState::s_DISCONNECTED)
     , m_autoReconnect(true)
     , m_reconnectInterval(5)
     , m_connectionTimeout(10)
@@ -44,7 +71,7 @@ void WebSocketClient::Initialize() {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         LOG_ERROR("Failed to initialize Winsock");
-        m_state = WebSocketState::ERROR;
+        m_state = WebSocketState::s_ERROR;
         return;
     }
 #endif
@@ -53,11 +80,11 @@ void WebSocketClient::Initialize() {
 }
 
 void WebSocketClient::Connect() {
-    if (m_state == WebSocketState::CONNECTED || m_state == WebSocketState::CONNECTING) {
+    if (m_state == WebSocketState::s_CONNECTED || m_state == WebSocketState::s_CONNECTING) {
         return;
     }
 
-    m_state = WebSocketState::CONNECTING;
+    m_state = WebSocketState::s_CONNECTING;
     m_running = true;
     m_shouldReconnect = false;
 
@@ -78,7 +105,7 @@ void WebSocketClient::Disconnect() {
         m_connectionThread.join();
     }
 
-    m_state = WebSocketState::DISCONNECTED;
+    m_state = WebSocketState::s_DISCONNECTED;
     LOG_INFO("WebSocket disconnected");
 }
 
@@ -151,7 +178,7 @@ void WebSocketClient::ConnectionThread() {
     SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock == INVALID_SOCKET) {
         LOG_ERROR("Failed to create socket");
-        m_state = WebSocketState::ERROR;
+        m_state = WebSocketState::s_ERROR;
         ScheduleReconnect();
         return;
     }
@@ -165,7 +192,7 @@ void WebSocketClient::ConnectionThread() {
     if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result) != 0) {
         LOG_ERROR("Failed to resolve host: " + host);
         closesocket(sock);
-        m_state = WebSocketState::ERROR;
+        m_state = WebSocketState::s_ERROR;
         ScheduleReconnect();
         return;
     }
@@ -180,7 +207,7 @@ void WebSocketClient::ConnectionThread() {
         LOG_ERROR("Failed to connect to server");
         freeaddrinfo(result);
         closesocket(sock);
-        m_state = WebSocketState::ERROR;
+        m_state = WebSocketState::s_ERROR;
         ScheduleReconnect();
         return;
     }
@@ -201,7 +228,7 @@ void WebSocketClient::ConnectionThread() {
     if (send(sock, handshakeStr.c_str(), (int)handshakeStr.length(), 0) == SOCKET_ERROR) {
         LOG_ERROR("Failed to send handshake");
         closesocket(sock);
-        m_state = WebSocketState::ERROR;
+        m_state = WebSocketState::s_ERROR;
         ScheduleReconnect();
         return;
     }
@@ -212,7 +239,7 @@ void WebSocketClient::ConnectionThread() {
     if (bytesReceived <= 0) {
         LOG_ERROR("Failed to receive handshake response");
         closesocket(sock);
-        m_state = WebSocketState::ERROR;
+        m_state = WebSocketState::s_ERROR;
         ScheduleReconnect();
         return;
     }
@@ -223,12 +250,12 @@ void WebSocketClient::ConnectionThread() {
     if (response.find("101") == std::string::npos) {
         LOG_ERROR("WebSocket upgrade failed");
         closesocket(sock);
-        m_state = WebSocketState::ERROR;
+        m_state = WebSocketState::s_ERROR;
         ScheduleReconnect();
         return;
     }
 
-    m_state = WebSocketState::CONNECTED;
+    m_state = WebSocketState::s_CONNECTED;
     LOG_INFO("WebSocket connected successfully");
     
     if (m_connectionCallback) {
@@ -236,13 +263,13 @@ void WebSocketClient::ConnectionThread() {
     }
 
     // Main receive loop
-    while (m_running && m_state == WebSocketState::CONNECTED) {
+    while (m_running && m_state == WebSocketState::s_CONNECTED) {
         bytesReceived = recv(sock, buffer, sizeof(buffer) - 1, 0);
         
         if (bytesReceived <= 0) {
             if (m_running) {
                 LOG_WARNING("Connection lost");
-                m_state = WebSocketState::DISCONNECTED;
+                m_state = WebSocketState::s_DISCONNECTED;
                 ScheduleReconnect();
             }
             break;
@@ -276,7 +303,7 @@ void WebSocketClient::ConnectionThread() {
             // Close frame
             else if (opcode == 0x08) {
                 LOG_INFO("Server requested close");
-                m_state = WebSocketState::DISCONNECTED;
+                m_state = WebSocketState::s_DISCONNECTED;
                 ScheduleReconnect();
                 break;
             }
@@ -296,7 +323,7 @@ void WebSocketClient::ConnectionThread() {
 #else
     // Non-Windows placeholder
     LOG_ERROR("WebSocket not implemented for this platform");
-    m_state = WebSocketState::ERROR;
+    m_state = WebSocketState::s_ERROR;
 #endif
 }
 
@@ -311,7 +338,7 @@ void WebSocketClient::ProcessMessage(const std::string& message) {
             event.giftId = data.value("giftId", "");
             event.giftName = data.value("giftName", "");
             event.username = data.value("username", "");
-            event.oderId = data.value("userId", "");
+            event.oderId = data.value("userId", ""); // updated to userId
             event.quantity = data.value("quantity", 1);
             event.timestamp = data.value("timestamp", 0);
             event.diamondCost = data.value("diamondCost", 0);
@@ -348,7 +375,7 @@ void WebSocketClient::ScheduleReconnect() {
     if (m_autoReconnect && m_running) {
         m_lastReconnectAttempt = std::chrono::system_clock::now().time_since_epoch().count() / 1000000000;
         m_shouldReconnect = true;
-        m_state = WebSocketState::RECONNECTING;
+        m_state = WebSocketState::s_RECONNECTING;
         LOG_INFO("Scheduled reconnection in " + std::to_string(m_reconnectInterval) + " seconds");
     }
 }

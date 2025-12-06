@@ -12,6 +12,8 @@
 #include <CStreaming.h>
 #include <CStreamingInfo.h>
 #include <CModelInfo.h>
+#include <CTheScripts.h>
+#include <extensions/ScriptCommands.h>
 
 namespace BattleGround {
 
@@ -87,6 +89,10 @@ SpawnResult NPCManager::SpawnNPC(const std::string& username, const std::string&
         LOG_ERROR(result.message);
         return result;
     }
+
+    std::string debugSpawn = std::string("Spawning NPC at ") + std::to_string(spawnPos.x) + "," + std::to_string(spawnPos.y) + "," + std::to_string(spawnPos.z);
+
+    LOG_DEBUG(debugSpawn);
 
     // Create BattleNPC wrapper
     auto battleNPC = std::make_unique<BattleNPC>(username, oderId, ped);
@@ -314,18 +320,23 @@ CPed* NPCManager::CreatePed(const Math::Vector3& position) {
 
     // Create the ped
     CVector pos(position.x, position.y, position.z);
-    CPed* ped = new CCivilianPed(ePedType::PEDTYPE_CIVMALE, modelId);
+    //CPed* ped = new CCivilianPed(ePedType::PED_TYPE_CIVMALE, modelId);
+    CPed *ped = nullptr;
+    plugin::Command<plugin::Commands::CREATE_CHAR>(PED_TYPE_MISSION8, modelId, 
+                                  position.x, position.y, position.z, &ped);
+    CStreaming::SetModelIsDeletable(modelId);
     
     if (ped) {
         ped->SetPosn(pos);
-        ped->SetOrientation(0, 0, Math::RandomFloat(0, Math::PI * 2));
+        //ped->SetOrientation(0, 0, Math::RandomFloat(0, 3.14159265358979323846f * 2));
+        plugin::Command<plugin::Commands::TASK_TURN_CHAR_TO_FACE_COORD>(ped, m_spawnCenter.x, m_spawnCenter.y, m_spawnCenter.z);
         
         // Set initial health
         ped->m_fMaxHealth = 100.0f;
         ped->m_fHealth = 100.0f;
         
         // Add to world
-        CWorld::Add(ped);
+        //CWorld::Add(ped);
         
         // Set ped flags for combat
         ped->m_nPedFlags.bDontFight = false;
@@ -339,12 +350,12 @@ CPed* NPCManager::CreatePed(const Math::Vector3& position) {
 
 Math::Vector3 NPCManager::GetRandomSpawnPosition() {
     Math::Vector3 pos = Math::RandomPointInCircle(m_spawnCenter, m_spawnRadius);
-    
-    // Find ground Z
-    // In a real implementation, you'd use CWorld::FindGroundZForCoord
-    // For now, we'll use the configured height
-    const auto& spawnConfig = ConfigManager::GetInstance().GetSpawnConfig();
-    pos.z = Math::RandomFloat(spawnConfig.minHeight, spawnConfig.maxHeight) + m_spawnCenter.z;
+
+    bool groundResult = false;
+    pos.z = CWorld::FindGroundZFor3DCoord (pos.x, pos.y, pos.z + 250.0f, &groundResult, 0) + 3.0f;
+    if (!groundResult) return GetRandomSpawnPosition();
+    //const auto& spawnConfig = ConfigManager::GetInstance().GetSpawnConfig();
+    //pos.z = Math::RandomFloat(spawnConfig.minHeight, spawnConfig.maxHeight) + m_spawnCenter.z;
     
     return pos;
 }

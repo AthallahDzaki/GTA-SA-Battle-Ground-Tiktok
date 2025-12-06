@@ -22,6 +22,19 @@ set(PSDK_BUILD_III OFF CACHE BOOL "" FORCE)
 set(PSDK_BUILD_SA ON CACHE BOOL "" FORCE)
 add_subdirectory(libs/plugin-sdk)
 
+include(cmake/CPM.cmake)
+
+# Sekarang bisa pakai CPM
+CPMAddPackage(
+    NAME Boost
+    VERSION 1.89.0
+    GITHUB_REPOSITORY "boostorg/boost"
+    GIT_TAG "boost-1.89.0"
+    OPTIONS
+        "BOOST_ENABLE_CMAKE ON"
+        "BOOST_INCLUDE_LIBRARIES system"
+)
+
 # Find Boost (required by websocketpp)
 find_package(Boost REQUIRED COMPONENTS system)
 

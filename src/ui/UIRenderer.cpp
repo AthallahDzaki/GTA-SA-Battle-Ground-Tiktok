@@ -7,6 +7,7 @@
 // GTA SA SDK includes
 #include <CFont.h>
 #include <CSprite2d.h>
+#include <CSprite.h>
 #include <CCamera.h>
 #include <CDraw.h>
 #include <CWorld.h>
@@ -331,8 +332,8 @@ void UIRenderer::DrawBox(float x, float y, float width, float height, unsigned i
 }
 
 void UIRenderer::WorldToScreen(float worldX, float worldY, float worldZ, float& screenX, float& screenY, bool& visible) {
-    CVector world(worldX, worldY, worldZ);
-    CVector screen;
+    RwV3d world = { worldX, worldY, worldZ + 1.0f };
+    RwV3d screen;
     
     // Use camera matrix to transform world to screen coordinates
     float w;

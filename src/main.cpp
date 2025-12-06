@@ -88,7 +88,7 @@ private:
         WebSocketClient::GetInstance().Connect();
 
         // Enable free camera
-        FreeCameraController::GetInstance().SetEnabled(true);
+        //FreeCameraController::GetInstance().SetEnabled(true);
 
         s_initialized = true;
         s_lastTime = static_cast<float>(CTimer::m_snTimeInMilliseconds) / 1000.0f;
@@ -108,7 +108,7 @@ private:
         MatchController::GetInstance().Shutdown();
         NPCManager::GetInstance().Shutdown();
         WebSocketClient::GetInstance().Shutdown();
-        FreeCameraController::GetInstance().Shutdown();
+        //FreeCameraController::GetInstance().Shutdown();
 
         Logger::GetInstance().Shutdown();
         s_initialized = false;
@@ -129,7 +129,7 @@ private:
         HandleInput();
 
         // Update all systems
-        FreeCameraController::GetInstance().Update(deltaTime);
+        //FreeCameraController::GetInstance().Update(deltaTime);
         WebSocketClient::GetInstance().Update();
         NPCManager::GetInstance().Update(deltaTime);
         MatchController::GetInstance().Update(deltaTime);
@@ -165,8 +165,7 @@ private:
         bool fast = GetAsyncKeyState(VK_SHIFT) & 0x8000;
         bool slow = GetAsyncKeyState(VK_MENU) & 0x8000; // Alt
 
-        FreeCameraController::GetInstance().HandleKeyboardInput(
-            forward, backward, left, right, up, down, fast, slow);
+        //FreeCameraController::GetInstance().HandleKeyboardInput(forward, backward, left, right, up, down, fast, slow);
 
         // Mouse movement for camera rotation
         static int lastMouseX = 0;
@@ -181,9 +180,10 @@ private:
         lastMouseX = mousePos.x;
         lastMouseY = mousePos.y;
         
-        FreeCameraController::GetInstance().HandleMouseMovement(deltaX, deltaY);
+        //FreeCameraController::GetInstance().HandleMouseMovement(deltaX, deltaY);
 
         // Toggle camera with F5
+        /*
         static bool f5Pressed = false;
         if (GetAsyncKeyState(VK_F5) & 0x8000) {
             if (!f5Pressed) {
@@ -194,7 +194,7 @@ private:
             }
         } else {
             f5Pressed = false;
-        }
+        }*/
 
         // Force start match with F6
         static bool f6Pressed = false;

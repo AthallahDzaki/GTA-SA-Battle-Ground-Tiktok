@@ -67,7 +67,9 @@ void FreeCameraController::Update(float deltaTime) {
     m_yaw += m_mouseDeltaX * m_mouseSensitivity;
 
     // Clamp pitch to prevent flipping
-    m_pitch = Math::Clamp(m_pitch, -Math::PI * 0.49f, Math::PI * 0.49f);
+    float cx = -3.14159265358979323846f * 0.49f;
+    float cy = 3.14159265358979323846f * 0.49f;
+    m_pitch = Math::Clamp(m_pitch, cx, cy);
 
     // Reset mouse delta
     m_mouseDeltaX = 0;
@@ -130,8 +132,8 @@ void FreeCameraController::UpdateFreeCamera(float deltaTime) {
     );
     
     Math::Vector3 right(
-        std::cos(m_yaw - Math::PI * 0.5f),
-        std::sin(m_yaw - Math::PI * 0.5f),
+        std::cos(m_yaw - 3.14159265358979323846f * 0.5f),
+        std::sin(m_yaw - 3.14159265358979323846f * 0.5f),
         0
     );
 

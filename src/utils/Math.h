@@ -3,14 +3,14 @@
 #include <cmath>
 #include <random>
 #include <cstdint>
+#include <type_traits> // for std::is_arithmetic_v
 
 namespace BattleGround {
 
 class Math {
 public:
-    static constexpr float PI = 3.14159265358979323846f;
-    static constexpr float DEG_TO_RAD = PI / 180.0f;
-    static constexpr float RAD_TO_DEG = 180.0f / PI;
+    static constexpr float DEG_TO_RAD = 3.14159265358979323846f / 180.0f;
+    static constexpr float RAD_TO_DEG = 180.0f / 3.14159265358979323846f;
 
     // Random number generation
     static float RandomFloat(float min, float max) {
@@ -77,7 +77,7 @@ public:
 
     // Generate random point in circle
     static Vector3 RandomPointInCircle(const Vector3& center, float radius) {
-        float angle = RandomFloat(0, 2.0f * PI);
+        float angle = RandomFloat(0, 2.0f * 3.14159265358979323846f);
         float r = std::sqrt(RandomFloat(0, 1)) * radius;
         return Vector3(
             center.x + r * std::cos(angle),
@@ -100,14 +100,15 @@ public:
     }
 
     // Clamp functions
-    static float Clamp(float value, float min, float max) {
-        if (value < min) return min;
-        if (value > max) return max;
-        return value;
+    template <typename T>
+    static inline constexpr T Clamp(T value, T lo, T hi) noexcept
+    {
+        static_assert(std::is_arithmetic_v<T>, "Clamp requires an arithmetic type");
+        return (value < lo) ? lo : (value > hi) ? hi : value;
     }
 
-    static float Clamp01(float value) {
-        return Clamp(value, 0.0f, 1.0f);
+    static inline constexpr float Clamp01(float value) noexcept {
+        return Clamp<float>(value, 0.0f, 1.0f);
     }
 
     // Distance calculation

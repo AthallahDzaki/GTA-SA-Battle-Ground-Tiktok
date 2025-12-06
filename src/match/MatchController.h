@@ -77,6 +77,7 @@ private:
     // Timers
     float m_countdown = 0;
     float m_winnerDelay = 0;
+    float m_nextMatchDelay = 0;
 
     // Winner
     BattleNPC* m_winner = nullptr;

@@ -6,6 +6,25 @@
 #include <sstream>
 #include <iomanip>
 
+//
+// Some common macros (DEBUG, INFO, WARNING, ERROR) are defined by various headers
+// (notably some platform headers). If those macros exist they will break the enum
+// declaration below (macro expansion produces invalid tokens). Undefine them here
+// so the enum compiles reliably.
+//
+#ifdef DEBUG
+#  undef DEBUG
+#endif
+#ifdef INFO
+#  undef INFO
+#endif
+#ifdef WARNING
+#  undef WARNING
+#endif
+#ifdef ERROR
+#  undef ERROR
+#endif
+
 namespace BattleGround {
 
 enum class LogLevel {
@@ -73,17 +92,28 @@ private:
     Logger& operator=(const Logger&) = delete;
 
     std::string GetTimestamp() {
-        time_t now = time(nullptr);
-        struct tm* timeinfo = localtime(&now);
+        std::time_t now = std::time(nullptr);
+        std::tm timeinfo{};
+
+        // Use thread-safe localtime variants where available
+    #if defined(_MSC_VER)
+        localtime_s(&timeinfo, &now);
+    #elif defined(__unix__) || defined(__APPLE__)
+        localtime_r(&now, &timeinfo);
+    #else
+        // Fallback (not thread-safe) if platform doesn't provide safe variant
+        std::tm* tmp = std::localtime(&now);
+        if (tmp) timeinfo = *tmp;
+    #endif
         
         std::ostringstream oss;
         oss << std::setfill('0')
-            << std::setw(4) << (1900 + timeinfo->tm_year) << "-"
-            << std::setw(2) << (1 + timeinfo->tm_mon) << "-"
-            << std::setw(2) << timeinfo->tm_mday << " "
-            << std::setw(2) << timeinfo->tm_hour << ":"
-            << std::setw(2) << timeinfo->tm_min << ":"
-            << std::setw(2) << timeinfo->tm_sec;
+            << std::setw(4) << (1900 + timeinfo.tm_year) << "-"
+            << std::setw(2) << (1 + timeinfo.tm_mon) << "-"
+            << std::setw(2) << timeinfo.tm_mday << " "
+            << std::setw(2) << timeinfo.tm_hour << ":"
+            << std::setw(2) << timeinfo.tm_min << ":"
+            << std::setw(2) << timeinfo.tm_sec;
         
         return oss.str();
     }
