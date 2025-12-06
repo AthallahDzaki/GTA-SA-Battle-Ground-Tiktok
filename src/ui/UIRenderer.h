@@ -68,7 +68,7 @@ private:
     void RenderNPCHealthBars();
     void RenderWinnerAnnouncement();
 
-    void DrawText(float x, float y, const std::string& text, unsigned int color = 0xFFFFFFFF, float scale = 1.0f);
+    void RenderText(float x, float y, const std::string& text, unsigned int color = 0xFFFFFFFF, float scale = 1.0f);
     void DrawBox(float x, float y, float width, float height, unsigned int color);
     void WorldToScreen(float worldX, float worldY, float worldZ, float& screenX, float& screenY, bool& visible);
 

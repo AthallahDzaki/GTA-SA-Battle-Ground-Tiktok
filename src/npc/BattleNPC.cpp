@@ -116,7 +116,7 @@ void BattleNPC::Revive(float healthPercent) {
         m_ped->m_fHealth = health;
         
         // Reset ped state
-        m_ped->m_nPedState = ePedState::PEDSTATE_IDLE;
+        m_ped->m_ePedState = ePedState::PEDSTATE_IDLE;
         
         m_state = NPCState::ALIVE;
         LOG_INFO("NPC revived: " + m_username + " with " + std::to_string(healthPercent) + "% health");
@@ -143,7 +143,7 @@ void BattleNPC::SetTargetPed(CPed* target) {
 void BattleNPC::ClearTarget() {
     m_targetPed = nullptr;
     if (m_ped && m_ped->m_pIntelligence) {
-        m_ped->m_pIntelligence->m_TaskMgr.ClearTasks(nullptr);
+        m_ped->m_pIntelligence->m_TaskMgr.Flush();
     }
 }
 
@@ -154,7 +154,7 @@ void BattleNPC::EnableCombatAI() {
         m_ped->m_nPedFlags.bStayInSamePlace = false;
         
         // Set ped to combat state
-        m_ped->m_nPedState = ePedState::PEDSTATE_ATTACK;
+        m_ped->m_ePedState = ePedState::PEDSTATE_ATTACK;
         
         LOG_DEBUG("Combat AI enabled for: " + m_username);
     }
@@ -163,7 +163,7 @@ void BattleNPC::EnableCombatAI() {
 void BattleNPC::DisableCombatAI() {
     if (m_ped && IsValid()) {
         ClearTarget();
-        m_ped->m_nPedState = ePedState::PEDSTATE_IDLE;
+        m_ped->m_ePedState = ePedState::PEDSTATE_IDLE;
         LOG_DEBUG("Combat AI disabled for: " + m_username);
     }
 }
