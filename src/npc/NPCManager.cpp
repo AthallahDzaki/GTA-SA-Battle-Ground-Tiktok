@@ -7,8 +7,10 @@
 #include <CPools.h>
 #include <CPopulation.h>
 #include <CPed.h>
+#include <CCivilianPed.h>
 #include <CPedModelInfo.h>
 #include <CStreaming.h>
+#include <CStreamingInfo.h>
 #include <CModelInfo.h>
 
 namespace BattleGround {
@@ -306,8 +308,8 @@ CPed* NPCManager::CreatePed(const Math::Vector3& position) {
     static const int pedModels[] = { 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25 };
     int modelId = pedModels[Math::RandomInt(0, sizeof(pedModels)/sizeof(pedModels[0]) - 1)];
 
-    // Load model if needed
-    CStreaming::RequestModel(modelId, STREAMING_GAME_REQUIRED);
+    // Load model if needed (use GAME_REQUIRED from eStreamingFlags)
+    CStreaming::RequestModel(modelId, GAME_REQUIRED);
     CStreaming::LoadAllRequestedModels(false);
 
     // Create the ped

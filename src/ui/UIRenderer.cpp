@@ -153,7 +153,7 @@ void UIRenderer::RenderMatchStatus() {
 
     // Draw at top center
     float screenWidth = static_cast<float>(RsGlobal.maximumWidth);
-    DrawText(screenWidth / 2.0f - 100.0f, 30.0f, status, color, 1.2f);
+    RenderText(screenWidth / 2.0f - 100.0f, 30.0f, status, color, 1.2f);
 }
 
 void UIRenderer::RenderNPCCounter() {
@@ -165,7 +165,7 @@ void UIRenderer::RenderNPCCounter() {
     
     // Draw below match status
     float screenWidth = static_cast<float>(RsGlobal.maximumWidth);
-    DrawText(screenWidth / 2.0f - 60.0f, 60.0f, counter, 0xFFFFFFFF, 1.0f);
+    RenderText(screenWidth / 2.0f - 60.0f, 60.0f, counter, 0xFFFFFFFF, 1.0f);
 }
 
 void UIRenderer::RenderNotifications() {
@@ -209,7 +209,7 @@ void UIRenderer::RenderNotifications() {
         // Apply alpha to color
         unsigned int finalColor = (color & 0x00FFFFFF) | (static_cast<unsigned int>(alpha * 255) << 24);
         
-        DrawText(screenWidth - 400.0f, y, notif.message, finalColor, 0.8f);
+        RenderText(screenWidth - 400.0f, y, notif.message, finalColor, 0.8f);
         y += 25.0f;
     }
 }
@@ -227,7 +227,7 @@ void UIRenderer::RenderKillFeed() {
         unsigned int color = 0xFFFFFFFF;
         color = (color & 0x00FFFFFF) | (static_cast<unsigned int>(alpha * 255) << 24);
         
-        DrawText(20.0f, y, text, color, 0.7f);
+        RenderText(20.0f, y, text, color, 0.7f);
         y += 20.0f;
     }
 }
@@ -245,7 +245,7 @@ void UIRenderer::RenderNPCNameTags() {
         WorldToScreen(pos.x, pos.y, pos.z + 1.5f, screenX, screenY, visible);
         
         if (visible) {
-            DrawText(screenX - 30.0f, screenY - 30.0f, npc->GetUsername(), 0xFFFFFFFF, 0.6f);
+            RenderText(screenX - 30.0f, screenY - 30.0f, npc->GetUsername(), 0xFFFFFFFF, 0.6f);
         }
     }
 }
@@ -279,7 +279,7 @@ void UIRenderer::RenderNPCHealthBars() {
             
             // Invulnerability indicator
             if (npc->IsInvulnerable()) {
-                DrawText(screenX - 20.0f, screenY - 25.0f, "INVULN", 0xFFFFFF00, 0.4f);
+                RenderText(screenX - 20.0f, screenY - 25.0f, "INVULN", 0xFFFFFF00, 0.4f);
             }
         }
     }
@@ -307,7 +307,7 @@ void UIRenderer::RenderWinnerAnnouncement() {
     CFont::PrintString(screenWidth / 2.0f, screenHeight / 2.0f + 20.0f, kills.c_str());
 }
 
-void UIRenderer::DrawText(float x, float y, const std::string& text, unsigned int color, float scale) {
+void UIRenderer::RenderText(float x, float y, const std::string& text, unsigned int color, float scale) {
     // Extract ARGB components
     unsigned char a = (color >> 24) & 0xFF;
     unsigned char r = (color >> 16) & 0xFF;

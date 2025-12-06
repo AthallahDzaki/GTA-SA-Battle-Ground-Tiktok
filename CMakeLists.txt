@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.30)
 project(GTASABattleGroundTikTok VERSION 1.0.0 LANGUAGES CXX)
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+# Set C++ standard (C++23 required for std::expected in safetyhook used by plugin-sdk)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -61,6 +61,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     _CRT_SECURE_NO_WARNINGS
     _WINSOCK_DEPRECATED_NO_WARNINGS
     ASIO_STANDALONE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
 )
 
 # Copy config.ini to output directory
