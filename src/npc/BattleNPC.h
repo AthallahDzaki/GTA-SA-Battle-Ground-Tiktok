@@ -51,7 +51,7 @@ public:
     void IncrementKillCount() { m_killCount++; }
     
     // Combat
-    void SetTargetPed(CPed* target);
+    void SetTargetPed();
     void ClearTarget();
     void EnableCombatAI();
     void DisableCombatAI();

@@ -17,6 +17,40 @@
 
 namespace BattleGround {
 
+void NPCManager::GenerateDecisionMaker() {
+    int decisionID = 0;
+    plugin::Command<plugin::Commands::LOAD_CHAR_DECISION_MAKER>(0, &decisionID);
+    
+    // Clear SEMUA event yang bisa menyebabkan flee/fear
+    static const int fearEvents[] = { 
+        1, 2, 3, 4,      // Collision events
+        9,               // Damage
+        11, 12, 13,      // Dead ped / potential run over / walk into ped
+        15,              // ShotFired - KEY EVENT!
+        26,              // PedToFlee - KEY EVENT! 
+        30,              // VehicleThreat
+        31,              // GunAimedAt - KEY EVENT!
+        43, 44, 46,      // Knocked over / walk into object/fire
+        49,              // ShotFiredWhizzedBy - KEY EVENT! 
+        50, 51,          // Low/High anger at player
+        52, 53,          // Health really low / low
+        58, 59,          // OnFire / FireNearby
+        61, 62,          // Sound loud/quiet
+        64,              // WaterCannon
+        65,              // SeenPanickedPed
+        72,              // SeenCop
+        75               // Danger - KEY EVENT!
+    };
+    
+    for (int eventID : fearEvents) {
+        plugin::Command<plugin::Commands::CLEAR_CHAR_DECISION_MAKER_EVENT_RESPONSE>(
+            decisionID, eventID
+        );
+    }
+
+    m_decisionMakerID = decisionID;
+}
+
 void NPCManager::Initialize() {
     if (m_initialized) return;
 
@@ -275,27 +309,6 @@ void NPCManager::EnableAllCombatAI() {
         npc->EnableCombatAI();
     }
     
-    // Make each NPC target a random other NPC
-    if (aliveNPCs.size() > 1) {
-        for (auto* npc : aliveNPCs) {
-            // Find a random target
-            BattleNPC* target = nullptr;
-            int attempts = 0;
-            while (attempts < 10) {
-                int idx = Math::RandomInt(0, static_cast<int>(aliveNPCs.size()) - 1);
-                if (aliveNPCs[idx] != npc && aliveNPCs[idx]->IsAlive()) {
-                    target = aliveNPCs[idx];
-                    break;
-                }
-                attempts++;
-            }
-            
-            if (target) {
-                npc->SetTargetPed(target->GetPed());
-            }
-        }
-    }
-    
     LOG_INFO("Combat AI enabled for all NPCs");
 }
 
@@ -341,6 +354,11 @@ CPed* NPCManager::CreatePed(const Math::Vector3& position) {
         // Set ped flags for combat
         ped->m_nPedFlags.bDontFight = false;
         ped->m_nPedFlags.bStayInSamePlace = false;
+        ped->m_nWeaponAccuracy = 1000;
+        ped->m_nWeaponShootingRate = 100;
+        plugin::Command<plugin::Commands::TASK_SET_CHAR_DECISION_MAKER>(ped, m_decisionMakerID);
+
+        LOG_DEBUG("Decision Maker ID: " + std::to_string(m_decisionMakerID));
         
         return ped;
     }

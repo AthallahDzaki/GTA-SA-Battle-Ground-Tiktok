@@ -7,6 +7,8 @@
 #include <CWeapon.h>
 #include <CTaskComplexKillPedOnFoot.h>
 #include <CTaskManager.h>
+#include <CTheScripts.h>
+#include <extensions/ScriptCommands.h>
 
 namespace BattleGround {
 
@@ -129,21 +131,14 @@ void BattleNPC::SetInvulnerable(float duration) {
     LOG_DEBUG("NPC " + m_username + " is now invulnerable for " + std::to_string(duration) + " seconds");
 }
 
-void BattleNPC::SetTargetPed(CPed* target) {
-    m_targetPed = target;
-    if (m_ped && target && IsValid()) {
-        // Create kill task
-        auto* task = new CTaskComplexKillPedOnFoot(target, -1, 0, 0, 0, 2);
-        if (task && m_ped->m_pIntelligence) {
-            m_ped->m_pIntelligence->m_TaskMgr.SetTask(task, 0, false);
-        }
-    }
+void BattleNPC::SetTargetPed() {
+    if(m_ped)
+        plugin::Command<plugin::Commands::SET_CHAR_RELATIONSHIP>(m_ped, 4, PED_TYPE_MISSION8);
 }
 
 void BattleNPC::ClearTarget() {
-    m_targetPed = nullptr;
     if (m_ped && m_ped->m_pIntelligence) {
-        m_ped->m_pIntelligence->m_TaskMgr.Flush();
+        plugin::Command<plugin::Commands::SET_CHAR_RELATIONSHIP>(m_ped, 0, PED_TYPE_MISSION8);
     }
 }
 
@@ -152,9 +147,8 @@ void BattleNPC::EnableCombatAI() {
         // Make ped aggressive
         m_ped->m_nPedFlags.bDontFight = false;
         m_ped->m_nPedFlags.bStayInSamePlace = false;
-        
-        // Set ped to combat state
-        m_ped->m_ePedState = ePedState::PEDSTATE_ATTACK;
+        m_ped->m_nPedFlags.bCrouchWhenScared = false;
+        m_ped->m_nPedFlags.bDoesntDropWeaponsWhenDead = true;
         
         LOG_DEBUG("Combat AI enabled for: " + m_username);
     }

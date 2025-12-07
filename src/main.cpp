@@ -48,6 +48,11 @@ public:
             OnGameUpdate();
         };
 
+        plugin::Events::initGameEvent += []() {
+            NPCManager::GetInstance().GenerateDecisionMaker();
+            LOG_DEBUG("Decision Maker Generated");
+        };
+
         plugin::Events::drawingEvent += []() {
             OnGameRender();
         };
@@ -60,6 +65,20 @@ public:
 private:
     static bool s_initialized;
     static float s_lastTime;
+
+    static void
+    UnProtectInstance ()
+    {
+        auto              hExecutableInstance = (size_t) GetModuleHandle (NULL);
+        IMAGE_NT_HEADERS *ntHeader
+            = (IMAGE_NT_HEADERS *) (hExecutableInstance
+                                    + ((IMAGE_DOS_HEADER *) hExecutableInstance)
+                                          ->e_lfanew);
+        SIZE_T size = ntHeader->OptionalHeader.SizeOfImage;
+        DWORD  oldProtect;
+        VirtualProtect ((VOID *) hExecutableInstance, size, PAGE_EXECUTE_READWRITE,
+                        &oldProtect);
+    }
 
     static void OnGameInit() {
         // Initialize logger first
@@ -90,6 +109,8 @@ private:
         // Enable free camera
         //FreeCameraController::GetInstance().SetEnabled(true);
 
+        UnProtectInstance();
+
         s_initialized = true;
         s_lastTime = static_cast<float>(CTimer::m_snTimeInMilliseconds) / 1000.0f;
         
@@ -116,6 +137,8 @@ private:
 
     static void OnGameUpdate() {
         if (!s_initialized || !CGame::CanSeeOutSideFromCurrArea()) return;
+
+        *reinterpret_cast<bool *> (0x96917A) = true;
 
         // Calculate delta time
         float currentTime = static_cast<float>(CTimer::m_snTimeInMilliseconds) / 1000.0f;

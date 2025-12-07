@@ -67,6 +67,9 @@ public:
     void EnableAllCombatAI();
     void DisableAllCombatAI();
 
+    // Decision Maker
+    void GenerateDecisionMaker();
+
 private:
     NPCManager() = default;
     ~NPCManager() = default;
@@ -100,6 +103,8 @@ private:
     std::vector<int> m_weaponList;
     bool m_useRandomWeapons;
     int m_defaultWeaponId;
+
+    int m_decisionMakerID;
 
     bool m_initialized = false;
 };

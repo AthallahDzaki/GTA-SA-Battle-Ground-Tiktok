@@ -3,6 +3,9 @@
 #include "../utils/Logger.h"
 #include "../utils/Math.h"
 
+#include <CTheScripts.h>
+#include <extensions/ScriptCommands.h>
+
 namespace BattleGround {
 
 void CombatSystem::Initialize() {
@@ -19,7 +22,7 @@ void CombatSystem::Initialize() {
 void CombatSystem::Update(float deltaTime) {
     if (!m_combatEnabled) return;
     
-    UpdateCombat(deltaTime);
+    //UpdateCombat(deltaTime);
 }
 
 void CombatSystem::Shutdown() {
@@ -28,9 +31,22 @@ void CombatSystem::Shutdown() {
     LOG_INFO("Combat System shutdown");
 }
 
+int CombatSystem::CreateDecisionMaker() {
+    int decisionID = -10;
+    decisionID = plugin::Command<plugin::Commands::COPY_SHARED_CHAR_DECISION_MAKER>(65542);
+    if (decisionID == -10) return -10;
+    plugin::Command<plugin::Commands::ADD_CHAR_DECISION_MAKER_EVENT_RESPONSE>(decisionID, 31, 1002, 0.0, 100.0, 0.0, 100.0, false, true);
+    return decisionID;
+}
+
 void CombatSystem::EnableCombat() {
     m_combatEnabled = true;
-    AssignTargets();
+    auto npcs = NPCManager::GetInstance().GetAllNPCs();
+    for (auto* npc : npcs) {
+        if (npc) {
+            npc->SetTargetPed();
+        }
+    }
     LOG_INFO("Combat enabled");
 }
 
@@ -48,67 +64,8 @@ void CombatSystem::DisableCombat() {
     LOG_INFO("Combat disabled");
 }
 
-void CombatSystem::AssignTargets() {
-    auto aliveNPCs = NPCManager::GetInstance().GetAliveNPCs();
-    
-    for (auto* npc : aliveNPCs) {
-        if (!npc || !npc->IsAlive()) continue;
-        
-        BattleNPC* target = FindNearestEnemy(npc);
-        if (target) {
-            npc->SetTargetPed(target->GetPed());
-        }
-    }
-    
-    LOG_DEBUG("Targets assigned to all alive NPCs");
-}
-
-void CombatSystem::RetargetDeadTargets() {
-    auto aliveNPCs = NPCManager::GetInstance().GetAliveNPCs();
-    
-    for (auto* npc : aliveNPCs) {
-        if (!npc || !npc->IsAlive()) continue;
-        
-        // Check if current target is dead or invalid
-        // For now, just reassign everyone
-        BattleNPC* target = FindNearestEnemy(npc);
-        if (target) {
-            npc->SetTargetPed(target->GetPed());
-        }
-    }
-}
-
 void CombatSystem::UpdateCombat(float deltaTime) {
     // Periodically retarget (every 2 seconds)
-    m_retargetTimer += deltaTime;
-    if (m_retargetTimer >= 2.0f) {
-        m_retargetTimer = 0;
-        RetargetDeadTargets();
-    }
-}
-
-BattleNPC* CombatSystem::FindNearestEnemy(BattleNPC* npc) {
-    if (!npc) return nullptr;
-    
-    auto aliveNPCs = NPCManager::GetInstance().GetAliveNPCs();
-    BattleNPC* nearest = nullptr;
-    float nearestDist = FLT_MAX;
-    
-    Math::Vector3 myPos = npc->GetPosition();
-    
-    for (auto* other : aliveNPCs) {
-        if (!other || other == npc || !other->IsAlive()) continue;
-        
-        Math::Vector3 otherPos = other->GetPosition();
-        float dist = Math::DistanceSquared(myPos, otherPos);
-        
-        if (dist < nearestDist) {
-            nearestDist = dist;
-            nearest = other;
-        }
-    }
-    
-    return nearest;
 }
 
 } // namespace BattleGround

@@ -21,9 +21,7 @@ public:
     void DisableCombat();
     bool IsCombatEnabled() const { return m_combatEnabled; }
 
-    // Make NPCs fight each other
-    void AssignTargets();
-    void RetargetDeadTargets();
+    int CreateDecisionMaker();
 
     // Stats
     int GetTotalKills() const { return m_totalKills; }
@@ -41,6 +39,7 @@ private:
     float m_retargetTimer = 0;
     int m_totalKills = 0;
     bool m_initialized = false;
+    int m_combatDecisionID = -10;
 };
 
 } // namespace BattleGround
