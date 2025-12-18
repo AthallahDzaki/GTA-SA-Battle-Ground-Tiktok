@@ -10,6 +10,8 @@
 #include <string>
 #include <functional>
 
+#include <CDecisionMakerTypes.h>
+
 namespace BattleGround {
 
 // Spawn result for UI feedback
@@ -69,6 +71,7 @@ public:
 
     // Decision Maker
     void GenerateDecisionMaker();
+    eDecisionMakerType GetDecisionMaker() { return decisionMakerHandle; };
 
 private:
     NPCManager() = default;
@@ -104,7 +107,7 @@ private:
     bool m_useRandomWeapons;
     int m_defaultWeaponId;
 
-    int m_decisionMakerID;
+    eDecisionMakerType decisionMakerHandle = eDecisionMakerType::UNKNOWN;
 
     bool m_initialized = false;
 };

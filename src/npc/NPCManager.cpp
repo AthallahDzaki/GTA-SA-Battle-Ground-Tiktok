@@ -3,6 +3,8 @@
 #include "../utils/Logger.h"
 
 // GTA SA SDK includes
+#include "game_sa/common.h"
+#include <CPlayerPed.h>
 #include <CWorld.h>
 #include <CPools.h>
 #include <CPopulation.h>
@@ -18,37 +20,25 @@
 namespace BattleGround {
 
 void NPCManager::GenerateDecisionMaker() {
-    int decisionID = 0;
-    plugin::Command<plugin::Commands::LOAD_CHAR_DECISION_MAKER>(0, &decisionID);
-    
-    // Clear SEMUA event yang bisa menyebabkan flee/fear
-    static const int fearEvents[] = { 
-        1, 2, 3, 4,      // Collision events
-        9,               // Damage
-        11, 12, 13,      // Dead ped / potential run over / walk into ped
-        15,              // ShotFired - KEY EVENT!
-        26,              // PedToFlee - KEY EVENT! 
-        30,              // VehicleThreat
-        31,              // GunAimedAt - KEY EVENT!
-        43, 44, 46,      // Knocked over / walk into object/fire
-        49,              // ShotFiredWhizzedBy - KEY EVENT! 
-        50, 51,          // Low/High anger at player
-        52, 53,          // Health really low / low
-        58, 59,          // OnFire / FireNearby
-        61, 62,          // Sound loud/quiet
-        64,              // WaterCannon
-        65,              // SeenPanickedPed
-        72,              // SeenCop
-        75               // Danger - KEY EVENT!
-    };
-    
-    for (int eventID : fearEvents) {
-        plugin::Command<plugin::Commands::CLEAR_CHAR_DECISION_MAKER_EVENT_RESPONSE>(
-            decisionID, eventID
-        );
-    }
+    CPlayerPed *player = FindPlayerPed ();
+    if (!player) return;
 
-    m_decisionMakerID = decisionID;
+    CVector position = player->TransformFromObjectSpace (CVector (0.0f, -5.0f, 3.0f));
+    CPed *ped = nullptr;
+    int modelId = 70;
+    CStreaming::RequestModel(modelId, GAME_REQUIRED);
+    CStreaming::LoadAllRequestedModels(false);
+    plugin::Command<plugin::Commands::CREATE_CHAR>(PED_TYPE_CIVMALE, modelId, 
+                                  position.x, position.y, position.z, &ped);
+    CStreaming::SetModelIsDeletable(modelId);
+
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_DANGER);
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_DAMAGE);
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_SHOT_FIRED);
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_DEAD_PED);
+
+    decisionMakerHandle = ped->m_pIntelligence->m_nDecisionMakerType;
+    //plugin::Command<plugin::Commands::REMOVE_CHAR_ELEGANTLY>(ped);
 }
 
 void NPCManager::Initialize() {
@@ -335,13 +325,12 @@ CPed* NPCManager::CreatePed(const Math::Vector3& position) {
     CVector pos(position.x, position.y, position.z);
     //CPed* ped = new CCivilianPed(ePedType::PED_TYPE_CIVMALE, modelId);
     CPed *ped = nullptr;
-    plugin::Command<plugin::Commands::CREATE_CHAR>(PED_TYPE_MISSION8, modelId, 
+    plugin::Command<plugin::Commands::CREATE_CHAR>(PED_TYPE_CIVMALE, modelId, 
                                   position.x, position.y, position.z, &ped);
     CStreaming::SetModelIsDeletable(modelId);
     
     if (ped) {
         ped->SetPosn(pos);
-        //ped->SetOrientation(0, 0, Math::RandomFloat(0, 3.14159265358979323846f * 2));
         plugin::Command<plugin::Commands::TASK_TURN_CHAR_TO_FACE_COORD>(ped, m_spawnCenter.x, m_spawnCenter.y, m_spawnCenter.z);
         
         // Set initial health
@@ -356,9 +345,12 @@ CPed* NPCManager::CreatePed(const Math::Vector3& position) {
         ped->m_nPedFlags.bStayInSamePlace = false;
         ped->m_nWeaponAccuracy = 1000;
         ped->m_nWeaponShootingRate = 100;
-        plugin::Command<plugin::Commands::TASK_SET_CHAR_DECISION_MAKER>(ped, m_decisionMakerID);
+        if (ped->m_pIntelligence)
+        {
+            ped->m_pIntelligence->SetPedDecisionMakerType(decisionMakerHandle);
+        }
 
-        LOG_DEBUG("Decision Maker ID: " + std::to_string(m_decisionMakerID));
+        plugin::Command<plugin::Commands::SET_CHAR_SIGNAL_AFTER_KILL>(ped, false); // Remove Sign After Kill
         
         return ped;
     }
@@ -389,9 +381,11 @@ int NPCManager::GetRandomWeapon() {
 void NPCManager::ProcessDeaths() {
     for (auto& npc : m_npcs) {
         if (!npc) continue;
+/*
+        LOG_DEBUG("NPC Death Detector for " + npc->GetUsername() + " State " + std::to_string((int)npc->GetState()));
         
         // Check if NPC just died
-        if (npc->GetPed() && npc->GetPed()->m_fHealth <= 0 && npc->IsAlive()) {
+        if (npc->GetPed() && npc->GetPed()->m_fHealth <= 0 && npc->GetState() != NPCState::DEAD) {
             // Mark as dead
             npc->SetState(NPCState::DEAD);
             
@@ -413,6 +407,7 @@ void NPCManager::ProcessDeaths() {
             LOG_INFO("NPC death detected: " + npc->GetUsername() + 
                      (killer ? " killed by " + killer->GetUsername() : ""));
         }
+*/
     }
 }
 

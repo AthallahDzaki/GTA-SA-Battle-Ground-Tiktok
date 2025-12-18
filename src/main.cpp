@@ -20,6 +20,7 @@
 #include <CWorld.h>
 #include <CCamera.h>
 
+#include "game_sa/common.h"
 #include "config/ConfigManager.h"
 #include "utils/Logger.h"
 #include "camera/FreeCameraController.h"
@@ -48,7 +49,12 @@ public:
             OnGameUpdate();
         };
 
+        plugin::Events::restartGameEvent += []{ 
+            OnGameRestart(); 
+        };
+
         plugin::Events::initGameEvent += []() {
+            
             NPCManager::GetInstance().GenerateDecisionMaker();
             LOG_DEBUG("Decision Maker Generated");
         };
@@ -78,6 +84,10 @@ private:
         DWORD  oldProtect;
         VirtualProtect ((VOID *) hExecutableInstance, size, PAGE_EXECUTE_READWRITE,
                         &oldProtect);
+    }
+
+    static void OnGameRestart() {
+        NPCManager::GetInstance().GenerateDecisionMaker(); // Regenerate Decision Maker
     }
 
     static void OnGameInit() {

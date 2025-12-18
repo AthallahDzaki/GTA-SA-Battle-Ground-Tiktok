@@ -4,11 +4,10 @@
 // GTA SA SDK includes
 #include <CPed.h>
 #include <CWorld.h>
-#include <CWeapon.h>
-#include <CTaskComplexKillPedOnFoot.h>
-#include <CTaskManager.h>
 #include <CTheScripts.h>
 #include <extensions/ScriptCommands.h>
+#include <CPickups.h>
+#include <CStreaming.h>
 
 namespace BattleGround {
 
@@ -25,8 +24,8 @@ BattleNPC::BattleNPC(const std::string& username, const std::string& oderId, CPe
 {
     if (m_ped) {
         m_maxHealth = m_ped->m_fMaxHealth;
+        LOG_DEBUG("BattleNPC created for user: " + username);
     }
-    LOG_DEBUG("BattleNPC created for user: " + username);
 }
 
 BattleNPC::~BattleNPC() {
@@ -75,6 +74,11 @@ void BattleNPC::Update(float deltaTime) {
 
 void BattleNPC::GiveWeapon(int weaponId, int ammo) {
     if (m_ped && IsValid()) {
+        int model = CPickups::ModelForWeapon ((eWeaponType)weaponId);
+        CStreaming::RequestModel (model, 2);
+        CStreaming::LoadAllRequestedModels (false);
+
+        CStreaming::SetModelIsDeletable (model);
         m_ped->GiveWeapon((eWeaponType)weaponId, ammo, true);
         m_ped->SetCurrentWeapon((eWeaponType)weaponId);
         m_weaponId = weaponId;
@@ -132,13 +136,14 @@ void BattleNPC::SetInvulnerable(float duration) {
 }
 
 void BattleNPC::SetTargetPed() {
-    if(m_ped)
-        plugin::Command<plugin::Commands::SET_CHAR_RELATIONSHIP>(m_ped, 4, PED_TYPE_MISSION8);
+    if(m_ped) {
+        plugin::Command<plugin::Commands::SET_CHAR_RELATIONSHIP>(m_ped, 4, PED_TYPE_CIVMALE);
+    }
 }
 
 void BattleNPC::ClearTarget() {
-    if (m_ped && m_ped->m_pIntelligence) {
-        plugin::Command<plugin::Commands::SET_CHAR_RELATIONSHIP>(m_ped, 0, PED_TYPE_MISSION8);
+    if (m_ped) {
+        plugin::Command<plugin::Commands::SET_CHAR_RELATIONSHIP>(m_ped, 0, PED_TYPE_CIVMALE);
     }
 }
 

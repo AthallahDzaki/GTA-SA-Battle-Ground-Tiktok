@@ -31,16 +31,9 @@ void CombatSystem::Shutdown() {
     LOG_INFO("Combat System shutdown");
 }
 
-int CombatSystem::CreateDecisionMaker() {
-    int decisionID = -10;
-    decisionID = plugin::Command<plugin::Commands::COPY_SHARED_CHAR_DECISION_MAKER>(65542);
-    if (decisionID == -10) return -10;
-    plugin::Command<plugin::Commands::ADD_CHAR_DECISION_MAKER_EVENT_RESPONSE>(decisionID, 31, 1002, 0.0, 100.0, 0.0, 100.0, false, true);
-    return decisionID;
-}
-
 void CombatSystem::EnableCombat() {
     m_combatEnabled = true;
+    
     auto npcs = NPCManager::GetInstance().GetAllNPCs();
     for (auto* npc : npcs) {
         if (npc) {
@@ -53,7 +46,6 @@ void CombatSystem::EnableCombat() {
 void CombatSystem::DisableCombat() {
     m_combatEnabled = false;
     
-    // Clear all targets
     auto npcs = NPCManager::GetInstance().GetAllNPCs();
     for (auto* npc : npcs) {
         if (npc) {
