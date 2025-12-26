@@ -24,7 +24,7 @@ import argparse
 from datetime import datetime
 
 # Configuration
-DEFAULT_SERVER = "ws://localhost:8080"
+DEFAULT_SERVER = "ws://localhost:35992"
 
 # Test data
 GIFTS = [

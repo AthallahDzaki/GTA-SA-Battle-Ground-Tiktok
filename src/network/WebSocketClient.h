@@ -112,7 +112,7 @@ private:
     ConnectionCallback m_connectionCallback;
 
     // Reconnection timer
-    int64_t m_lastReconnectAttempt{0};
+    std::chrono::steady_clock::time_point m_lastReconnectAttempt;
 };
 
 } // namespace BattleGround

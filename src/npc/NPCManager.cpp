@@ -16,29 +16,33 @@
 #include <CModelInfo.h>
 #include <CTheScripts.h>
 #include <extensions/ScriptCommands.h>
+#include <CPedDamageResponseCalculator.h>
+#include <CDecisionMakerTypes.h>
+
+// We Add Damage Response Calculator for Death
+
+using namespace plugin;
+
+// CPedDamageResponseCalculator *thisCalc, CPed *ped, CPedDamageResponse *a3, bool bSpeak)
+ThiscallEvent <AddressList<0x4B5B27, H_CALL>, PRIORITY_AFTER,
+    ArgPick<ArgTypes<CPedDamageResponseCalculator*, CPed*, CPedDamageResponse*, bool>, 0, 1, 2, 3>,
+    void (CPedDamageResponseCalculator*, CPed*, CPedDamageResponse*, bool)>
+        DamageResponseCalculator;
 
 namespace BattleGround {
 
 void NPCManager::GenerateDecisionMaker() {
-    CPlayerPed *player = FindPlayerPed ();
-    if (!player) return;
+    auto dmManager = CDecisionMakerTypes::GetInstance();
+    if (!dmManager) return; // try again later
 
-    CVector position = player->TransformFromObjectSpace (CVector (0.0f, -5.0f, 3.0f));
-    CPed *ped = nullptr;
-    int modelId = 70;
-    CStreaming::RequestModel(modelId, GAME_REQUIRED);
-    CStreaming::LoadAllRequestedModels(false);
-    plugin::Command<plugin::Commands::CREATE_CHAR>(PED_TYPE_CIVMALE, modelId, 
-                                  position.x, position.y, position.z, &ped);
-    CStreaming::SetModelIsDeletable(modelId);
+    decisionMakerHandle = dmManager->AddDecisionMaker(&dmManager->m_DefaultRandomPedDecisionMaker);
 
-    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_DANGER);
-    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_DAMAGE);
-    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_SHOT_FIRED);
-    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(ped->m_pIntelligence->m_nDecisionMakerType, eEventType::EVENT_DEAD_PED);
+    if (decisionMakerHandle == eDecisionMakerType::UNKNOWN) return;
 
-    decisionMakerHandle = ped->m_pIntelligence->m_nDecisionMakerType;
-    //plugin::Command<plugin::Commands::REMOVE_CHAR_ELEGANTLY>(ped);
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(decisionMakerHandle, eEventType::EVENT_DANGER);
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(decisionMakerHandle, eEventType::EVENT_DAMAGE);
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(decisionMakerHandle, eEventType::EVENT_SHOT_FIRED);
+    CDecisionMakerTypes::GetInstance()->FlushDecisionMakerEventResponse(decisionMakerHandle, eEventType::EVENT_DEAD_PED);
 }
 
 void NPCManager::Initialize() {
@@ -53,6 +57,26 @@ void NPCManager::Initialize() {
     m_weaponList = weaponsConfig.weaponList;
     m_useRandomWeapons = weaponsConfig.useRandomWeapons;
     m_defaultWeaponId = weaponsConfig.defaultWeaponId;
+
+    DamageResponseCalculator += [this](CPedDamageResponseCalculator *thisCalc, CPed *ped, CPedDamageResponse *damageResponse, bool bSpeak) {
+        if (!ped || !thisCalc || !thisCalc->m_pDamager) return;
+        if (ped->m_fHealth <= 0.0f) {
+            // Try to find killer
+            BattleNPC* victim = GetNPCByPed(static_cast<CPed*>(ped));
+            BattleNPC* killer = nullptr;
+            if (ped && thisCalc->m_pDamager) {
+                killer = GetNPCByPed(reinterpret_cast<CPed*>(const_cast<CEntity*>(thisCalc->m_pDamager)));
+                if (killer) {
+                    killer->IncrementKillCount();
+                }
+            }
+            
+            // Notify callback
+            if (m_deathCallback) {
+                m_deathCallback(victim, killer);
+            }
+        }
+    };
 
     m_initialized = true;
     LOG_INFO("NPC Manager initialized");
@@ -379,36 +403,7 @@ int NPCManager::GetRandomWeapon() {
 }
 
 void NPCManager::ProcessDeaths() {
-    for (auto& npc : m_npcs) {
-        if (!npc) continue;
-/*
-        LOG_DEBUG("NPC Death Detector for " + npc->GetUsername() + " State " + std::to_string((int)npc->GetState()));
-        
-        // Check if NPC just died
-        if (npc->GetPed() && npc->GetPed()->m_fHealth <= 0 && npc->GetState() != NPCState::DEAD) {
-            // Mark as dead
-            npc->SetState(NPCState::DEAD);
-            
-            // Try to find killer
-            BattleNPC* killer = nullptr;
-            CPed* ped = npc->GetPed();
-            if (ped && ped->m_pLastEntityDamage) {
-                killer = GetNPCByPed(static_cast<CPed*>(ped->m_pLastEntityDamage));
-                if (killer) {
-                    killer->IncrementKillCount();
-                }
-            }
-            
-            // Notify callback
-            if (m_deathCallback) {
-                m_deathCallback(npc.get(), killer);
-            }
-            
-            LOG_INFO("NPC death detected: " + npc->GetUsername() + 
-                     (killer ? " killed by " + killer->GetUsername() : ""));
-        }
-*/
-    }
+    // Unused
 }
 
 void NPCManager::UpdateUsernameMap() {

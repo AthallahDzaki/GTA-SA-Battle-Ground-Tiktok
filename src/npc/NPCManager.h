@@ -73,14 +73,14 @@ public:
     void GenerateDecisionMaker();
     eDecisionMakerType GetDecisionMaker() { return decisionMakerHandle; };
 
+    CPed* CreatePed(const Math::Vector3& position);
+    Math::Vector3 GetRandomSpawnPosition();
+
 private:
     NPCManager() = default;
     ~NPCManager() = default;
     NPCManager(const NPCManager&) = delete;
     NPCManager& operator=(const NPCManager&) = delete;
-
-    CPed* CreatePed(const Math::Vector3& position);
-    Math::Vector3 GetRandomSpawnPosition();
     int GetRandomWeapon();
     void ProcessDeaths();
     void UpdateUsernameMap();

@@ -32,6 +32,10 @@
 #include "ui/UIRenderer.h"
 
 using namespace BattleGround;
+using namespace plugin;
+
+CdeclEvent <AddressList<0x5BA340, H_CALL>, PRIORITY_AFTER, ArgPickNone, void()>              
+    SCMLoaded2;
 
 class GTASABattleGroundTikTok {
 public:
@@ -49,18 +53,16 @@ public:
             OnGameUpdate();
         };
 
-        plugin::Events::restartGameEvent += []{ 
-            OnGameRestart(); 
-        };
-
-        plugin::Events::initGameEvent += []() {
-            
-            NPCManager::GetInstance().GenerateDecisionMaker();
-            LOG_DEBUG("Decision Maker Generated");
+        plugin::Events::restartGameEvent += []() { 
+            //OnGameRestart(); 
         };
 
         plugin::Events::drawingEvent += []() {
             OnGameRender();
+        };
+
+        SCMLoaded2 += []() {
+            OnGameRestart();
         };
 
         plugin::Events::drawHudEvent += []() {
@@ -88,6 +90,7 @@ private:
 
     static void OnGameRestart() {
         NPCManager::GetInstance().GenerateDecisionMaker(); // Regenerate Decision Maker
+        LOG_DEBUG("Decision Maker Generated");
     }
 
     static void OnGameInit() {
@@ -296,6 +299,29 @@ private:
     }
 
     static void TrySpawnFromGift(const GiftEvent& event) {
+        // Check if match state is WAITING
+        if (MatchController::GetInstance().GetState() != MatchState::WAITING) {
+            // Ignore spawns during active match
+            return;
+        }
+
+        // Check if gift ID is in the join gift list
+        const auto& spawnConfig = ConfigManager::GetInstance().GetSpawnConfig();
+        const auto& joinGiftIds = spawnConfig.joinGiftIds;
+        
+        bool isJoinGift = false;
+        for (const auto& giftId : joinGiftIds) {
+            if (event.giftId == giftId) {
+                isJoinGift = true;
+                break;
+            }
+        }
+        
+        if (!isJoinGift) {
+            // Ignore non-join gifts
+            return;
+        }
+        
         // Spawn NPCs based on quantity
         for (int i = 0; i < event.quantity; i++) {
             auto result = NPCManager::GetInstance().SpawnNPC(event);
@@ -323,8 +349,6 @@ private:
             if (victim) {
                 if (killer) {
                     UIRenderer::GetInstance().AddKillFeedEntry(killer->GetUsername(), victim->GetUsername());
-                    UIRenderer::GetInstance().AddNotification(NotificationType::NPC_DEATH,
-                        killer->GetUsername() + " eliminated " + victim->GetUsername());
                 } else {
                     UIRenderer::GetInstance().AddNotification(NotificationType::NPC_DEATH,
                         victim->GetUsername() + " died");

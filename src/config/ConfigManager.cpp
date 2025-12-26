@@ -30,6 +30,7 @@ bool ConfigManager::Load(const std::string& filename) {
     m_spawn.minHeight = GetFloat("Spawn", "MinHeight", 10.0f);
     m_spawn.maxHeight = GetFloat("Spawn", "MaxHeight", 20.0f);
     m_spawn.oneNPCPerUsername = GetBool("Spawn", "OneNPCPerUsername", true);
+    m_spawn.joinGiftIds = GetStringList("Spawn", "JoinGiftIds", {"rose"});
 
     // Load WebSocket config
     m_websocket.serverURL = GetValue("WebSocket", "ServerURL", "ws://localhost:8080");

@@ -40,6 +40,13 @@
 
 #include <chrono>
 #include <sstream>
+#include <vector>
+#include <cstdint>
+#include <cstddef>
+#include <cstdlib>
+#include <ctime>
+#include <algorithm>
+#include <cstring>
 
 using json = nlohmann::json;
 
@@ -52,7 +59,6 @@ WebSocketClient::WebSocketClient()
     , m_connectionTimeout(10)
     , m_running(false)
     , m_shouldReconnect(false)
-    , m_lastReconnectAttempt(0)
 {
 }
 
@@ -112,8 +118,13 @@ void WebSocketClient::Disconnect() {
 void WebSocketClient::Update() {
     // Check for reconnection
     if (m_shouldReconnect && m_autoReconnect) {
-        auto now = std::chrono::system_clock::now().time_since_epoch().count() / 1000000000;
-        if (now - m_lastReconnectAttempt >= m_reconnectInterval) {
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = now - m_lastReconnectAttempt; // duration
+
+        LOG_DEBUG("Elapsed (s): " + std::to_string(
+            std::chrono::duration_cast<std::chrono::seconds>(elapsed).count()
+        ));
+        if (elapsed >= std::chrono::seconds(m_reconnectInterval)) {
             m_shouldReconnect = false;
             Connect();
         }
@@ -138,15 +149,123 @@ void WebSocketClient::Shutdown() {
     LOG_INFO("WebSocket client shutdown");
 }
 
+// parse header safe: returns true jika header lengkap. Untuk build 32-bit, dataLen dibatasi ke uint32_t.
+static bool parse_websocket_header_safe(const char* buffer, size_t bytesReceived,
+                                 uint32_t &dataLen, size_t &payloadOffset, bool &masked)
+{
+    if (bytesReceived < 2) return false;
+
+    uint8_t b0 = static_cast<uint8_t>(buffer[0]);
+    uint8_t b1 = static_cast<uint8_t>(buffer[1]);
+
+    masked = (b1 & 0x80) != 0;
+    uint8_t payloadLen = b1 & 0x7F;
+
+    size_t index = 2;
+
+    if (payloadLen <= 125) {
+        dataLen = payloadLen;
+    } else if (payloadLen == 126) {
+        if (bytesReceived < index + 2) return false;
+        uint8_t hi = static_cast<uint8_t>(buffer[index]);
+        uint8_t lo = static_cast<uint8_t>(buffer[index + 1]);
+        uint32_t len = (static_cast<uint32_t>(hi) << 8) | static_cast<uint32_t>(lo);
+        dataLen = len;
+        index += 2;
+    } else { // payloadLen == 127
+        // need 8 bytes; read big-endian. For 32-bit client, reject if > UINT32_MAX.
+        if (bytesReceived < index + 8) return false;
+        uint64_t len64 = 0;
+        for (int i = 0; i < 8; ++i) {
+            len64 = (len64 << 8) | static_cast<uint8_t>(buffer[index + i]);
+        }
+        index += 8;
+        if (len64 > static_cast<uint64_t>(UINT32_MAX)) {
+            // too large for 32-bit client - reject
+            return false;
+        }
+        dataLen = static_cast<uint32_t>(len64);
+    }
+
+    if (masked) {
+        if (bytesReceived < index + 4) return false;
+        index += 4;
+    }
+
+    // safety cap (optional)
+    const uint32_t MAX_ALLOWED = 1u << 30; // example 1 GiB cap
+    if (dataLen > MAX_ALLOWED) return false;
+
+    payloadOffset = index;
+    return true;
+}
+
+// Append recv into vector buffer. Returns <=0 on close/error (same as recv).
+static int recv_append(SOCKET s, std::vector<char>& buf)
+{
+    char tmp[4096];
+    int r = recv(s, tmp, sizeof(tmp), 0);
+    if (r > 0) {
+        buf.insert(buf.end(), tmp, tmp + r);
+    }
+    return r;
+}
+
+// Send a websocket frame (client MUST mask frames sent to server).
+// opcode: e.g., 0x01=text, 0x0A=pong, 0x08=close
+static bool send_ws_frame(SOCKET s, uint8_t opcode, const std::vector<char>& payload)
+{
+    std::vector<char> out;
+    out.reserve(14 + payload.size());
+
+    uint8_t fin_and_opcode = 0x80 | (opcode & 0x0F);
+    out.push_back(static_cast<char>(fin_and_opcode));
+
+    // client-to-server MUST set mask bit
+    uint64_t len = payload.size();
+    if (len <= 125) {
+        out.push_back(static_cast<char>(0x80 | static_cast<uint8_t>(len)));
+    } else if (len <= 0xFFFF) {
+        out.push_back(static_cast<char>(0x80 | 126));
+        out.push_back(static_cast<char>((len >> 8) & 0xFF));
+        out.push_back(static_cast<char>(len & 0xFF));
+    } else {
+        out.push_back(static_cast<char>(0x80 | 127));
+        // 64-bit length big-endian
+        for (int i = 7; i >= 0; --i) {
+            out.push_back(static_cast<char>((len >> (8 * i)) & 0xFF));
+        }
+    }
+
+    // generate mask key
+    uint8_t maskKey[4];
+    srand(static_cast<unsigned int>(time(NULL)) ^ GetCurrentThreadId());
+    for (int i = 0; i < 4; ++i) maskKey[i] = static_cast<uint8_t>(rand() & 0xFF);
+
+    out.push_back(static_cast<char>(maskKey[0]));
+    out.push_back(static_cast<char>(maskKey[1]));
+    out.push_back(static_cast<char>(maskKey[2]));
+    out.push_back(static_cast<char>(maskKey[3]));
+
+    // masked payload
+    for (size_t i = 0; i < payload.size(); ++i) {
+        uint8_t maskedByte = static_cast<uint8_t>(payload[i]) ^ maskKey[i % 4];
+        out.push_back(static_cast<char>(maskedByte));
+    }
+
+    int sent = send(s, out.data(), (int)out.size(), 0);
+    return (sent == (int)out.size());
+}
+
 void WebSocketClient::ConnectionThread() {
     // Simple WebSocket client implementation
     // In production, use a proper WebSocket library like websocketpp or beast
-    
+
     // Parse URL to get host and port
     std::string url = m_serverUrl;
     std::string host;
     int port = 80;
-    
+
     // Remove ws:// or wss:// prefix
     if (url.substr(0, 5) == "ws://") {
         url = url.substr(5);
@@ -154,11 +273,11 @@ void WebSocketClient::ConnectionThread() {
         url = url.substr(6);
         port = 443;
     }
-    
+
     // Extract host and port
     size_t colonPos = url.find(':');
     size_t slashPos = url.find('/');
-    
+
     if (colonPos != std::string::npos) {
         host = url.substr(0, colonPos);
         size_t portEnd = (slashPos != std::string::npos) ? slashPos : url.length();
@@ -233,9 +352,9 @@ void WebSocketClient::ConnectionThread() {
         return;
     }
 
-    // Receive handshake response
-    char buffer[4096];
-    int bytesReceived = recv(sock, buffer, sizeof(buffer) - 1, 0);
+    // Receive handshake response (read until header end or timeout)
+    char tmpBuf[4096];
+    int bytesReceived = recv(sock, tmpBuf, (int)sizeof(tmpBuf) - 1, 0);
     if (bytesReceived <= 0) {
         LOG_ERROR("Failed to receive handshake response");
         closesocket(sock);
@@ -243,10 +362,10 @@ void WebSocketClient::ConnectionThread() {
         ScheduleReconnect();
         return;
     }
-    buffer[bytesReceived] = '\0';
+    tmpBuf[bytesReceived] = '\0';
 
     // Check for successful upgrade
-    std::string response(buffer);
+    std::string response(tmpBuf);
     if (response.find("101") == std::string::npos) {
         LOG_ERROR("WebSocket upgrade failed");
         closesocket(sock);
@@ -257,69 +376,114 @@ void WebSocketClient::ConnectionThread() {
 
     m_state = WebSocketState::s_CONNECTED;
     LOG_INFO("WebSocket connected successfully");
-    
+
     if (m_connectionCallback) {
         m_connectionCallback(true);
     }
 
     // Main receive loop
-    while (m_running && m_state == WebSocketState::s_CONNECTED) {
-        bytesReceived = recv(sock, buffer, sizeof(buffer) - 1, 0);
-        
-        if (bytesReceived <= 0) {
-            if (m_running) {
-                LOG_WARNING("Connection lost");
+    {
+        std::vector<char> buf;
+        buf.reserve(8192);
+        bool exitLoop = false;
+
+        while (m_running && m_state == WebSocketState::s_CONNECTED && !exitLoop) {
+            int r = recv_append(sock, buf);
+            if (r == 0) {
+                // orderly close from server
+                LOG_INFO("Connection closed by remote");
                 m_state = WebSocketState::s_DISCONNECTED;
                 ScheduleReconnect();
-            }
-            break;
-        }
-
-        // Parse WebSocket frame (simplified)
-        if (bytesReceived >= 2) {
-            // Get opcode and payload length
-            unsigned char opcode = buffer[0] & 0x0F;
-            unsigned char payloadLen = buffer[1] & 0x7F;
-            
-            // Text frame
-            if (opcode == 0x01) {
-                int offset = 2;
-                int dataLen = payloadLen;
-                
-                if (payloadLen == 126 && bytesReceived >= 4) {
-                    dataLen = (buffer[2] << 8) | buffer[3];
-                    offset = 4;
-                } else if (payloadLen == 127 && bytesReceived >= 10) {
-                    // 64-bit length (we'll just use lower 32 bits)
-                    dataLen = (buffer[6] << 24) | (buffer[7] << 16) | (buffer[8] << 8) | buffer[9];
-                    offset = 10;
+                break;
+            } else if (r < 0) {
+                int err = WSAGetLastError();
+                if (err == WSAETIMEDOUT) {
+                    // timeout is expected occasionally; check m_running and continue
+                    continue;
                 }
-                
-                if (offset + dataLen <= bytesReceived) {
-                    std::string message(buffer + offset, dataLen);
-                    ProcessMessage(message);
-                }
-            }
-            // Close frame
-            else if (opcode == 0x08) {
-                LOG_INFO("Server requested close");
+                LOG_WARNING("recv failed, error: " + std::to_string(err));
                 m_state = WebSocketState::s_DISCONNECTED;
                 ScheduleReconnect();
                 break;
             }
-            // Ping frame - respond with pong
-            else if (opcode == 0x09) {
-                buffer[0] = (buffer[0] & 0xF0) | 0x0A; // Change to pong
-                send(sock, buffer, bytesReceived, 0);
-            }
+
+            // Try to parse as many frames as available in buffer
+            while (true) {
+                uint32_t dataLen = 0;
+                size_t payloadOffset = 0;
+                bool masked = false;
+
+                bool header_ok = parse_websocket_header_safe(buf.data(), buf.size(), dataLen, payloadOffset, masked);
+                if (!header_ok) {
+                    // header incomplete - wait for more data
+                    break;
+                }
+
+                size_t totalNeeded = payloadOffset + static_cast<size_t>(dataLen);
+                if (buf.size() < totalNeeded) {
+                    // payload incomplete - wait for more data
+                    break;
+                }
+
+                // Safe to extract opcode and handle frame
+                uint8_t b0 = static_cast<uint8_t>(buf[0]);
+                uint8_t opcode = b0 & 0x0F;
+
+                // Extract payload into vector
+                std::vector<char> payload;
+                if (dataLen > 0) {
+                    payload.resize(dataLen);
+                    memcpy(payload.data(), buf.data() + payloadOffset, dataLen);
+                }
+
+                // If masked, unmask (mask key positioned at payloadOffset - 4)
+                if (masked) {
+                    if (payloadOffset >= 4) {
+                        const uint8_t* maskKey = reinterpret_cast<const uint8_t*>(buf.data() + (payloadOffset - 4));
+                        for (uint32_t i = 0; i < dataLen; ++i) {
+                            payload[i] = static_cast<char>( static_cast<uint8_t>(payload[i]) ^ maskKey[i % 4] );
+                        }
+                    } else {
+                        LOG_WARNING("Malformed masked frame (mask key not present)");
+                    }
+                }
+
+                // Handle opcodes
+                if (opcode == 0x01) { // text
+                    std::string message(payload.begin(), payload.end());
+                    ProcessMessage(message);
+                } else if (opcode == 0x08) { // close
+                    LOG_INFO("Server requested close");
+                    m_state = WebSocketState::s_DISCONNECTED;
+                    ScheduleReconnect();
+                    // consume and exit
+                    buf.erase(buf.begin(), buf.begin() + totalNeeded);
+                    exitLoop = true;
+                    break;
+                } else if (opcode == 0x09) { // ping: reply with pong, same payload
+                    bool ok = send_ws_frame(sock, 0x0A, payload); // client MUST mask
+                    if (!ok) {
+                        LOG_WARNING("Failed to send pong");
+                    }
+                } else if (opcode == 0x0A) { // pong - ignore or log
+                    // optional: handle keepalive logic
+                } else {
+                    // other opcodes: continuation, binary, etc. ignore or implement as needed
+                }
+
+                // consume processed bytes from buffer and continue parsing possible next frames
+                buf.erase(buf.begin(), buf.begin() + totalNeeded);
+            } // inner parsing loop
+        } // main loop
+
+        // cleanup: close socket
+        closesocket(sock);
+
+        if (m_connectionCallback) {
+            m_connectionCallback(false);
         }
     }
 
-    closesocket(sock);
-    
-    if (m_connectionCallback) {
-        m_connectionCallback(false);
-    }
 #else
     // Non-Windows placeholder
     LOG_ERROR("WebSocket not implemented for this platform");
@@ -330,10 +494,10 @@ void WebSocketClient::ConnectionThread() {
 void WebSocketClient::ProcessMessage(const std::string& message) {
     try {
         json j = json::parse(message);
-        
+
         if (j.contains("type") && j["type"] == "gift") {
             GiftEvent event;
-            
+
             auto& data = j["data"];
             event.giftId = data.value("giftId", "");
             event.giftName = data.value("giftName", "");
@@ -373,7 +537,7 @@ bool WebSocketClient::PopEvent(GiftEvent& outEvent) {
 
 void WebSocketClient::ScheduleReconnect() {
     if (m_autoReconnect && m_running) {
-        m_lastReconnectAttempt = std::chrono::system_clock::now().time_since_epoch().count() / 1000000000;
+        m_lastReconnectAttempt = std::chrono::steady_clock::now();
         m_shouldReconnect = true;
         m_state = WebSocketState::s_RECONNECTING;
         LOG_INFO("Scheduled reconnection in " + std::to_string(m_reconnectInterval) + " seconds");

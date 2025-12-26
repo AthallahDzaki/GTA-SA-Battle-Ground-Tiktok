@@ -22,6 +22,7 @@ struct SpawnConfig {
     float minHeight = 10.0f;
     float maxHeight = 20.0f;
     bool oneNPCPerUsername = true;
+    std::vector<std::string> joinGiftIds = {"rose"};
 };
 
 struct WebSocketConfig {

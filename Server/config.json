@@ -1,0 +1,6 @@
+{
+    "JoinUsingComment": {
+        "enable" : true,
+        "comment" : "Join Bang"
+    }
+}

@@ -11,7 +11,7 @@
 
 const WebSocket = require('ws');
 
-const PORT = 8080;
+const PORT = 35992;
 const GIFT_INTERVAL = 5000; // 5 seconds
 
 // Available test gifts
@@ -121,7 +121,7 @@ function broadcastGift() {
 }
 
 // Send gift events periodically
-setInterval(broadcastGift, GIFT_INTERVAL);
+//setInterval(broadcastGift, GIFT_INTERVAL);
 
 // Handle server shutdown
 process.on('SIGINT', () => {

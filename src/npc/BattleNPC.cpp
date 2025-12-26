@@ -1,4 +1,5 @@
 #include "BattleNPC.h"
+#include "NPCManager.h"
 #include "../utils/Logger.h"
 
 // GTA SA SDK includes
@@ -49,17 +50,11 @@ Math::Vector3 BattleNPC::GetPosition() const {
 }
 
 void BattleNPC::Update(float deltaTime) {
-    if (!IsValid()) {
-        if (m_state != NPCState::DEAD) {
-            m_state = NPCState::DEAD;
-        }
-        return;
-    }
-
     // Update invulnerability timer
     if (m_state == NPCState::INVULNERABLE) {
         m_invulnerabilityTimer -= deltaTime;
         if (m_invulnerabilityTimer <= 0) {
+            m_ped->m_nPhysicalFlags.bBulletProof = false;
             m_state = NPCState::ALIVE;
             LOG_DEBUG("Invulnerability ended for: " + m_username);
         }
@@ -117,21 +112,24 @@ void BattleNPC::Kill() {
 
 void BattleNPC::Revive(float healthPercent) {
     if (m_ped) {
+        plugin::Command<plugin::Commands::REMOVE_CHAR_ELEGANTLY>(m_ped);
+        m_ped = NPCManager::GetInstance().CreatePed(NPCManager::GetInstance().GetRandomSpawnPosition());
         // Resurrect the ped if possible
         float health = m_maxHealth * (healthPercent / 100.0f);
         m_ped->m_fHealth = health;
         
-        // Reset ped state
-        m_ped->m_ePedState = ePedState::PEDSTATE_IDLE;
-        
         m_state = NPCState::ALIVE;
         LOG_INFO("NPC revived: " + m_username + " with " + std::to_string(healthPercent) + "% health");
+        SetTargetPed();
     }
 }
 
 void BattleNPC::SetInvulnerable(float duration) {
     m_state = NPCState::INVULNERABLE;
     m_invulnerabilityTimer = duration;
+    if(m_ped) {
+         m_ped->m_nPhysicalFlags.bBulletProof = true;
+    }
     LOG_DEBUG("NPC " + m_username + " is now invulnerable for " + std::to_string(duration) + " seconds");
 }
 

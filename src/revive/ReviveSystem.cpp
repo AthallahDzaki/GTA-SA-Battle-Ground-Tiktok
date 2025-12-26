@@ -100,6 +100,7 @@ ReviveResult ReviveSystem::TryRevive(const std::string& username, const std::str
     npc->Revive(static_cast<float>(m_reviveHealthPercent));
     npc->SetInvulnerable(static_cast<float>(m_invulnerabilitySeconds));
     npc->EnableCombatAI();
+    npc->SetTargetPed();  // Set HATE relationship to make NPC attack others
 
     // Notify match controller
     MatchController::GetInstance().OnNPCRevived();
